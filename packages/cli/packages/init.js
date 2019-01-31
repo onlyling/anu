@@ -1,3 +1,7 @@
+/*!
+输出命令行提示与选择模板
+*/
+
 /* eslint no-console: 0 */
 
 const validateProjectName = require('validate-npm-package-name');
@@ -6,6 +10,7 @@ const fs = require('fs-extra');
 const path = require('path');
 const inquirer = require('inquirer');
 const ownRoot = path.join(__dirname, '..');
+const config = require('./config');
 const exists = fs.existsSync;
 
 const ignore = new Set(['.DS_Store', '.git', '.gitignore']);
@@ -22,6 +27,17 @@ const init = appName => {
         .catch(err => {
             console.log(err);
         });
+};
+
+const projectConfigJson = {
+    'appid': 'touristappid',
+    'setting': {
+        'urlCheck': true,
+        'es6': true,
+        'postcss': true,
+        'minified': true,
+        'newFeature': true
+    }
 };
 
 const checkNameIsOk = appName => {
@@ -60,10 +76,13 @@ const askTemplate = () => {
             name: '网易云音乐',
             value: 'music'
         },
-
         {
             name: '拼多多',
             value: 'pdd'
+        },
+        {
+            name: '默认模板',
+            value: 'helloNanachi'
         }
     ];
     q.push({
@@ -88,12 +107,24 @@ const writeDir = appName => {
     const templates = fs.readdirSync(path.join(__dirname, '..', 'templates'));
     templates.forEach(item => {
         if (ignore.has(item) || item != TEMPLATE) return;
-        let src = path.join(ownRoot, 'templates', item, 'src');
+        let src = path.join(ownRoot, 'templates', item, 'source');
         let pkg = path.join(ownRoot, 'templates', item, 'package.json');
-        let dist = path.join(appName, 'src');
+        let dist = path.join(appName,  config.sourceDir );
         let distPkg = path.join(appName, 'package.json');
         fs.copySync(src, dist);
         fs.copySync(pkg, distPkg);
+    });
+
+    //写入project.config.json
+    let pathLevel = appName.split(path.sep);
+    let projectname = pathLevel[pathLevel.length-1];
+    projectConfigJson['projectname'] = projectname;
+    let projectConfigJsonDist = path.join( appName, config.sourceDir , 'project.config.json');
+    fs.ensureFileSync( projectConfigJsonDist );
+    fs.writeFile(projectConfigJsonDist, JSON.stringify(projectConfigJson, null, 4), (err)=>{
+        if (err) {
+            console.log(err);
+        }
     });
 
     console.log(
@@ -102,15 +133,22 @@ const writeDir = appName => {
         )}\n`
     );
 
-    console.log(chalk.green('mpreact watch'));
-    console.log(`  实时构建项目, \n
-                   \t或使用mpreact watch:ali 构建支付宝小程序\n
-                   \t或使用mpreact watch:bu 构建百度智能小程序`);
+    console.log(chalk.green('nanachi watch'));
+    console.log(`  实时构建项目, 
+                   \t或使用nanachi watch:ali 构建支付宝小程序
+                   \t或使用nanachi watch:tt 构建头条小程序
+                   \t或使用nanachi watch:quick 构建快应用
+                   \t或使用nanachi watch:bu 构建百度智能小程序
+                   \t或使用nanachi watch:h5 构建h5`);
+
     console.log();
-    console.log(chalk.green('mpreact build'));
-    console.log(`  构建项目(构建出错的情况下，修复后需要强制全量构建), \n
-                   \t或使用mpreact build:ali 构建支付宝小程序\n
-                   \t或使用mpreact build:bu 构建百度智能小程序`);
+    console.log(chalk.green('nanachi build'));
+    console.log(`  构建项目(构建出错的情况下，修复后需要强制全量构建), 
+                   \t或使用nanachi build:ali 构建支付宝小程序
+                   \t或使用nanachi build:tt 构建头条小程序
+                   \t或使用nanachi build:quick 构建快应用
+                   \t或使用nanachi build:bu 构建百度智能小程序
+                   \t或使用nanachi watch:h5 构建h5`);
     console.log();
     console.log(
         chalk.magenta(
@@ -120,7 +158,7 @@ const writeDir = appName => {
     );
     console.log();
     console.log(`  cd ${appName} && npm i `);
-    console.log('  mpreact watch');
+    console.log('  nanachi watch');
     console.log();
 };
 

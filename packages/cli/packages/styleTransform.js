@@ -1,120 +1,86 @@
+/* eslint no-console: 0 */
 const path = require('path');
-const cwd = process.cwd();
 const queue = require('./queue');
 const config = require('./config');
 const utils = require('./utils');
-const fs = require('fs-extra');
-const validateStyle = require('./validateStyle');
-const appSassStyleFileNameReg = /app\.(scss|sass)$/;
-
-
-const isLess = (filePath)=>{
-    return /\.less$/.test(filePath);
-};
-const isCss = (filePath)=>{
-    return /\.css$/.test(filePath);
-};
-const isSass = (filePath)=>{
-    return /\.(scss|sass)$/.test(filePath);
-};
-const getDist = (filePath) =>{
-    let { name, dir } = path.parse(filePath);
-    let relativePath = path.relative( path.join(cwd, 'src'), dir);
-    let distDir = path.join(cwd, 'dist', relativePath);
-    let styleExt = config[config['buildType']].styleExt; //获取构建的样式文件后缀名
-    let distFilePath = path.join(distDir, `${name}.${styleExt}` );
-    return distFilePath;
-};
-
-var less = require('less');
-/* eslint-disable */
-const compileLess = (filePath, originalCode)=>{
-    less.render(
-        originalCode,
-        {
-            filename: filePath
-        }
-    )
-    .then(res => {
-        let code = validateStyle(res.css);
-        queue.push({
-            code: code,
-            path: getDist(filePath),
-            type: 'css'
-        });
-    })
-    .catch(err => {
-        if (err){
-        // eslint-disable-next-line
-        console.log(err);
-        }
-    });
-    
-};
-
-const renderSass = (filePath, originalCode)=>{
-    let sass = require(path.join(cwd, 'node_modules', 'node-sass'));
-    
-    /**
-     * node-sass配置{data : originalCode}处理@import语句比较繁琐，所以用{file: filePath},
-     * 但app样式中可能存在动态分析插入的@import引用component样式，所以先写入一个隐藏文件, file api读取的是隐藏文件目录
-     */
-    if(appSassStyleFileNameReg.test(filePath)){
-        try {
-            var hideAppStylePath = filePath.replace(/app\.(scss|sass)$/, '.app.$1');
-            fs.ensureFileSync(hideAppStylePath);
-            fs.writeFileSync(hideAppStylePath, originalCode)
-        } catch(err) {
-            if (err) {
-                console.log(err);
-            }
-        }
+const exitName = config[config['buildType']].styleExt;
+const crypto = require('crypto');
+const compileSassByPostCss = require('./stylesTransformer/postcssTransformSass');
+const compileLessByPostCss = require('./stylesTransformer/postcssTransformLess');
+const compileSass = require('./stylesTransformer/transformSass');
+// const compileLess = require('./stylesTransformer/transformLess');
+let cache = {};
+//缓存层，避免重复编译
+let needUpdate = (id, originalCode, fn) => {
+    let sha1 = crypto
+        .createHash('sha1')
+        .update(originalCode)
+        .digest('hex');
+    if (!cache[id] || cache[id] != sha1) {
+        cache[id] = sha1;
+        fn();
     }
-   
-    
-   
-    sass.render(
-        {
-            file: appSassStyleFileNameReg.test(filePath) ? hideAppStylePath : filePath
-        },
-        (err, res) => {
-            if (err) throw err;
-            let code = validateStyle(res.css.toString());
+};
+
+//获取dist路径
+let getDist = (filePath) =>{
+    let dist = utils.updatePath(filePath, config.sourceDir, 'dist');
+    let { name, dir, ext} =  path.parse(dist);
+    let distPath = '';
+    config.buildType === 'h5'
+        ? distPath = path.join(dir, `${name}${ext}`)
+        : distPath = path.join(dir, `${name}.${exitName}`);
+    return distPath;
+};
+
+//用户工程下是否有node-sass
+let hasNodeSass = utils.hasNpm('node-sass');
+const compilerMap = {
+    '.less': compileLessByPostCss,
+    '.css':  compileLessByPostCss,
+    '.sass': hasNodeSass ? compileSass : compileSassByPostCss,
+    '.scss': hasNodeSass ? compileSass : compileSassByPostCss
+};
+
+function runCompileStyle(filePath, originalCode){
+    needUpdate(filePath, originalCode,  ()=>{
+        let exitName = path.extname(filePath);
+
+        if (config.buildType === 'h5') {
             queue.push({
-                code: code,
+                code: originalCode,
                 path: getDist(filePath),
                 type: 'css'
             });
-            
-
-            if (appSassStyleFileNameReg.test(filePath)) {
-                fs.remove(hideAppStylePath, (err)=>{
-                    if(err){
-                        console.log(err);
-                    }
-                })
-            }
-           
-            
+            return;
         }
-    );
-};
-const compileSass = (filePath, originalCode)=>{
-    try {
-        require( path.join(cwd, 'node_modules', 'node-sass', 'package.json') );
-    } catch (err) {
-        utils.installer('node-sass')
-    }
-    renderSass(filePath, originalCode);
-};
 
+        // 补丁 queue的占位符, 防止同步代码执行时间过长产生的多次构建结束的问题
+        const placeholder = {
+            code: '',
+            path: getDist(filePath),
+            type: 'css'
+        };
+        queue.push(placeholder);
+        // 补丁 END
+        compilerMap[exitName](filePath, originalCode)
+            .then((result)=>{
+                let { code } = result;
+                queue.push({
+                    code: code,
+                    path: getDist(filePath),
+                    type: 'css'
+                });
+            })
+            .catch((err)=>{
+                // eslint-disable-next-line
+                console.log(filePath, '\n', err);
+                process.exit(1);
+            });
+    });
+}
 
-module.exports = (data)=>{
-    const {id, originalCode} = data;
-    if (isLess(id) || isCss(id)){
-        compileLess(id, originalCode);
-    } else if (isSass(id)){
-        compileSass(id, originalCode);
-    }
-
+module.exports =  (data) => {
+    let {id, originalCode} = data;
+    runCompileStyle(id, originalCode);
 };

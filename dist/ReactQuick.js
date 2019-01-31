@@ -1,7 +1,5 @@
-
 /**
- * 运行于快应用的React by 司徒正美 Copyright 2018-10-17
- * IE9+
+ * 运行于快应用的React by 司徒正美 Copyright 2019-01-21
  */
 
 var arrayPush = Array.prototype.push;
@@ -81,15 +79,17 @@ function inherit(SubClass, SupClass) {
 try {
     var supportEval = Function('a', 'return a + 1')(2) == 3;
 } catch (e) {}
+var rname = /function\s+(\w+)/;
 function miniCreateClass(ctor, superClass, methods, statics) {
-    var className = ctor.name || 'IEComponent';
+    var className = ctor.name || (ctor.toString().match(rname) || ['', 'Anonymous'])[1];
     var Ctor = supportEval ? Function('superClass', 'ctor', 'return function ' + className + ' (props, context) {\n            superClass.apply(this, arguments); \n            ctor.apply(this, arguments);\n      }')(superClass, ctor) : function ReactInstance() {
         superClass.apply(this, arguments);
         ctor.apply(this, arguments);
     };
     Ctor.displayName = className;
-    var fn = inherit(Ctor, superClass);
-    extend(fn, methods);
+    var proto = inherit(Ctor, superClass);
+    extend(proto, methods);
+    extend(Ctor, superClass);
     if (statics) {
         extend(Ctor, statics);
     }
@@ -175,10 +175,10 @@ Component.prototype = {
         return this.updater.isMounted(this);
     },
     setState: function setState(state, cb) {
-        this.updater.enqueueSetState(this, state, cb);
+        this.updater.enqueueSetState(get(this), state, cb);
     },
     forceUpdate: function forceUpdate(cb) {
-        this.updater.enqueueSetState(this, true, cb);
+        this.updater.enqueueSetState(get(this), true, cb);
     },
     render: function render() {
         throw "must implement render";
@@ -543,391 +543,963 @@ var PureComponent = miniCreateClass(function PureComponent() {
     }
 });
 
-var onAndSyncApis = {
-  onSocketOpen: true,
-  onSocketError: true,
-  onSocketMessage: true,
-  onSocketClose: true,
-  onBackgroundAudioPlay: true,
-  onBackgroundAudioPause: true,
-  onBackgroundAudioStop: true,
-  onNetworkStatusChange: true,
-  onAccelerometerChange: true,
-  onCompassChange: true,
-  onBluetoothAdapterStateChange: true,
-  onBluetoothDeviceFound: true,
-  onBLEConnectionStateChange: true,
-  onBLECharacteristicValueChange: true,
-  onBeaconUpdate: true,
-  onBeaconServiceChange: true,
-  onUserCaptureScreen: true,
-  onHCEMessage: true,
-  onGetWifiList: true,
-  onWifiConnected: true,
-  setStorageSync: true,
-  getStorageSync: true,
-  getStorageInfoSync: true,
-  removeStorageSync: true,
-  clearStorageSync: true,
-  getSystemInfoSync: true,
-  getExtConfigSync: true,
-  getLogManager: true
-};
-var noPromiseApis = {
-  stopRecord: true,
-  getRecorderManager: true,
-  pauseVoice: true,
-  stopVoice: true,
-  pauseBackgroundAudio: true,
-  stopBackgroundAudio: true,
-  getBackgroundAudioManager: true,
-  createAudioContext: true,
-  createInnerAudioContext: true,
-  createVideoContext: true,
-  createCameraContext: true,
-  navigateBack: true,
-  createMapContext: true,
-  canIUse: true,
-  startAccelerometer: true,
-  stopAccelerometer: true,
-  startCompass: true,
-  stopCompass: true,
-  hideToast: true,
-  hideLoading: true,
-  showNavigationBarLoading: true,
-  hideNavigationBarLoading: true,
-  createAnimation: true,
-  pageScrollTo: true,
-  createSelectorQuery: true,
-  createCanvasContext: true,
-  createContext: true,
-  drawCanvas: true,
-  hideKeyboard: true,
-  stopPullDownRefresh: true,
-  arrayBufferToBase64: true,
-  base64ToArrayBuffer: true,
-  getUpdateManager: true,
-  createWorker: true
-};
-var otherApis = {
-  uploadFile: true,
-  downloadFile: true,
-  connectSocket: true,
-  sendSocketMessage: true,
-  closeSocket: true,
-  chooseImage: true,
-  previewImage: true,
-  getImageInfo: true,
-  saveImageToPhotosAlbum: true,
-  startRecord: true,
-  playVoice: true,
-  getBackgroundAudioPlayerState: true,
-  playBackgroundAudio: true,
-  seekBackgroundAudio: true,
-  chooseVideo: true,
-  saveVideoToPhotosAlbum: true,
-  loadFontFace: true,
-  saveFile: true,
-  getFileInfo: true,
-  getSavedFileList: true,
-  getSavedFileInfo: true,
-  removeSavedFile: true,
-  openDocument: true,
-  setStorage: true,
-  getStorage: true,
-  getStorageInfo: true,
-  removeStorage: true,
-  clearStorage: true,
-  navigateTo: true,
-  redirectTo: true,
-  switchTab: true,
-  reLaunch: true,
-  getLocation: true,
-  chooseLocation: true,
-  openLocation: true,
-  getSystemInfo: true,
-  getNetworkType: true,
-  makePhoneCall: true,
-  scanCode: true,
-  setClipboardData: true,
-  getClipboardData: true,
-  openBluetoothAdapter: true,
-  closeBluetoothAdapter: true,
-  getBluetoothAdapterState: true,
-  startBluetoothDevicesDiscovery: true,
-  stopBluetoothDevicesDiscovery: true,
-  getBluetoothDevices: true,
-  getConnectedBluetoothDevices: true,
-  createBLEConnection: true,
-  closeBLEConnection: true,
-  getBLEDeviceServices: true,
-  getBLEDeviceCharacteristics: true,
-  readBLECharacteristicValue: true,
-  writeBLECharacteristicValue: true,
-  notifyBLECharacteristicValueChange: true,
-  startBeaconDiscovery: true,
-  stopBeaconDiscovery: true,
-  getBeacons: true,
-  setScreenBrightness: true,
-  getScreenBrightness: true,
-  setKeepScreenOn: true,
-  vibrateLong: true,
-  vibrateShort: true,
-  addPhoneContact: true,
-  getHCEState: true,
-  startHCE: true,
-  stopHCE: true,
-  sendHCEMessage: true,
-  startWifi: true,
-  stopWifi: true,
-  connectWifi: true,
-  getWifiList: true,
-  setWifiList: true,
-  getConnectedWifi: true,
-  showToast: true,
-  showLoading: true,
-  showModal: true,
-  showActionSheet: true,
-  setNavigationBarTitle: true,
-  setNavigationBarColor: true,
-  setTabBarBadge: true,
-  removeTabBarBadge: true,
-  showTabBarRedDot: true,
-  hideTabBarRedDot: true,
-  setTabBarStyle: true,
-  setTabBarItem: true,
-  showTabBar: true,
-  hideTabBar: true,
-  setTopBarText: true,
-  startPullDownRefresh: true,
-  canvasToTempFilePath: true,
-  canvasGetImageData: true,
-  canvasPutImageData: true,
-  getExtConfig: true,
-  login: true,
-  checkSession: true,
-  authorize: true,
-  getUserInfo: true,
-  requestPayment: true,
-  showShareMenu: true,
-  hideShareMenu: true,
-  updateShareMenu: true,
-  getShareInfo: true,
-  chooseAddress: true,
-  addCard: true,
-  openCard: true,
-  openSetting: true,
-  getSetting: true,
-  getWeRunData: true,
-  navigateToMiniProgram: true,
-  navigateBackMiniProgram: true,
-  chooseInvoiceTitle: true,
-  checkIsSupportSoterAuthentication: true,
-  startSoterAuthentication: true,
-  checkIsSoterEnrolledInDevice: true
-};
-
-function initPxTransform() {
-    var wxConfig = this.api;
-    var windowWidth = 375;
-    wxConfig.designWidth = windowWidth;
-    wxConfig.deviceRatio = 750 / windowWidth / 2;
-    if (wxConfig.getSystemInfo) {
-        wxConfig.getSystemInfo({
-            success: function success(res) {
-                windowWidth = res.windowWidth;
-                wxConfig.designWidth = windowWidth;
-                wxConfig.deviceRatio = 750 / windowWidth / 2;
-            }
-        });
-    }
-}
-var RequestQueue = {
-    MAX_REQUEST: 5,
-    queue: [],
-    request: function request(options) {
-        this.push(options);
-        this.run();
-    },
-    push: function push(options) {
-        this.queue.push(options);
-    },
-    run: function run() {
-        var _arguments = arguments,
-            _this = this;
-        if (!this.queue.length) {
-            return;
-        }
-        if (this.queue.length <= this.MAX_REQUEST) {
-            var options = this.queue.shift();
-            var completeFn = options.complete;
-            options.complete = function () {
-                completeFn && completeFn.apply(options, [].concat(Array.prototype.slice.call(_arguments)));
-                _this.run();
-            };
-            if (this.facade.httpRequest) {
-                this.facade.httpRequest(options);
-            } else if (this.facade.request) {
-                this.facade.request(options);
-            }
-        }
-    }
-};
-function request(options) {
-    options = options || {};
-    if (typeof options === 'string') {
-        options = {
-            url: options
-        };
-    }
-    var originSuccess = options['success'];
-    var originFail = options['fail'];
-    var originComplete = options['complete'];
-    var p = new Promise(function (resolve, reject) {
-        options['success'] = function (res) {
-            res.statusCode = res.status || res.statusCode;
-            res.header = res.headers || res.header;
-            originSuccess && originSuccess(res);
-            resolve(res);
-        };
-        options['fail'] = function (res) {
-            originFail && originFail(res);
-            reject(res);
-        };
-        options['complete'] = function (res) {
-            originComplete && originComplete(res);
-        };
-        RequestQueue.request(options);
-    });
-    return p;
-}
-function processApis(ReactWX, facade) {
-    var weApis = Object.assign({}, onAndSyncApis, noPromiseApis, otherApis);
-    Object.keys(weApis).forEach(function (key) {
-        if (!onAndSyncApis[key] && !noPromiseApis[key]) {
-            ReactWX.api[key] = function (options) {
-                options = options || {};
-                var task = null;
-                var obj = Object.assign({}, options);
-                if (typeof options === 'string') {
-                    return facade[key](options);
-                }
-                var p = new Promise(function (resolve, reject) {
-                    ['fail', 'success', 'complete'].forEach(function (k) {
-                        obj[k] = function (res) {
-                            options[k] && options[k](res);
-                            if (k === 'success') {
-                                if (key === 'connectSocket') {
-                                    resolve(task);
-                                } else {
-                                    resolve(res);
-                                }
-                            } else if (k === 'fail') {
-                                reject(res);
-                            }
-                        };
-                    });
-                    task = facade[key](obj);
-                });
-                if (key === 'uploadFile' || key === 'downloadFile') {
-                    p.progress = function (cb) {
-                        task.onProgressUpdate(cb);
-                        return p;
-                    };
-                    p.abort = function (cb) {
-                        cb && cb();
-                        task.abort();
-                        return p;
-                    };
-                }
-                return p;
-            };
-        } else {
-            ReactWX.api[key] = function () {
-                return facade[key].apply(facade, arguments);
-            };
-        }
-    });
-}
-function pxTransform(size) {
-    var deviceRatio = this.api.deviceRatio;
-    return parseInt(size, 10) / deviceRatio + 'rpx';
-}
-function injectAPIs(ReactWX, facade, override) {
-    ReactWX.api = {};
-    processApis(ReactWX, facade);
-    ReactWX.api.request = request;
-    if (typeof getCurrentPages == 'function') {
-        ReactWX.getCurrentPages = getCurrentPages;
-    }
-    if (typeof getApp == 'function') {
-        ReactWX.getApp = getApp;
-    }
-    if (override) {
-        var obj = override(facade);
-        Object.assign(ReactWX.api, obj);
-    }
-    RequestQueue.facade = facade;
-    ReactWX.initPxTransform = initPxTransform.bind(ReactWX)();
-    ReactWX.pxTransform = pxTransform.bind(ReactWX);
-}
-
-var eventSystem = {
-    dispatchEvent: function dispatchEvent(e) {
-        if (e.type == 'message') {
-            return;
-        }
-        var target = e.currentTarget;
-        var dataset = target.dataset || {};
-        var eventUid = dataset[toLowerCase(e.type) + 'Uid'];
-        var instance = this.reactInstance;
-        if (!instance) {
-            return;
-        }
-        if (!instance.$$eventCached) {
-            return;
-        }
-        var fiber = instance.$$eventCached[eventUid + 'Fiber'];
-        if (e.type == 'change' && fiber) {
-            if (fiber.props.value + '' == e.detail.value) {
-                return;
-            }
-        }
-        var key = dataset['key'];
-        eventUid += key != null ? '-' + key : '';
-        if (instance) {
-            Renderer.batchedUpdates(function () {
-                try {
-                    var fn = instance.$$eventCached[eventUid];
-                    fn && fn.call(instance, createEvent(e, target));
-                } catch (err) {
-                    console.log(err.stack);
-                }
-            }, e);
-        }
-    }
-};
-function createEvent(e, target) {
-    var event = {};
-    if (e.detail) {
-        event.detail = e.detail;
-        Object.assign(event, e.detail);
-        Object.assign(target, e.detail);
-    }
-    event.stopPropagation = function () {
-        console.warn("小程序不支持这方法，请使用catchXXX");
-    };
-    event.preventDefault = returnFalse;
-    event.type = e.type;
-    event.currentTarget = event.target = target;
-    event.touches = e.touches;
-    event.timeStamp = new Date() - 0;
-    return event;
-}
-
 function AnuPortal(props) {
     return props.children;
 }
+function createPortal(children, parent) {
+    var child = createElement(AnuPortal, { children: children, parent: parent });
+    child.isPortal = true;
+    return child;
+}
+
+var MAX_NUMBER = 1073741823;
+function createContext(defaultValue, calculateChangedBits) {
+    if (calculateChangedBits == void 0) {
+        calculateChangedBits = null;
+    }
+    var instance = {
+        value: defaultValue,
+        subscribers: []
+    };
+    var Provider = miniCreateClass(function Provider(props) {
+        this.value = props.value;
+        getContext.subscribers = this.subscribers = [];
+        instance = this;
+    }, Component, {
+        componentWillUnmount: function componentWillUnmount() {
+            this.subscribers.length = 0;
+        },
+        UNSAFE_componentWillReceiveProps: function UNSAFE_componentWillReceiveProps(nextProps) {
+            if (this.props.value !== nextProps.value) {
+                var oldValue = this.props.value;
+                var newValue = nextProps.value;
+                var changedBits = void 0;
+                if (Object.is(oldValue, newValue)) {
+                    changedBits = 0;
+                } else {
+                    this.value = newValue;
+                    changedBits = isFn(calculateChangedBits) ? calculateChangedBits(oldValue, newValue) : MAX_NUMBER;
+                    changedBits |= 0;
+                    if (changedBits !== 0) {
+                        instance.subscribers.forEach(function (fiber) {
+                            if (fiber.setState) {
+                                fiber.setState({ value: newValue });
+                                fiber = get(fiber);
+                            }
+                            Renderer.updateComponent(fiber, true);
+                        });
+                    }
+                }
+            }
+        },
+        render: function render() {
+            return this.props.children;
+        }
+    });
+    var Consumer = miniCreateClass(function Consumer() {
+        instance.subscribers.push(this);
+        this.observedBits = 0;
+        this.state = {
+            value: instance.value
+        };
+    }, Component, {
+        componentWillUnmount: function componentWillUnmount() {
+            var i = instance.subscribers.indexOf(this);
+            instance.subscribers.splice(i, 1);
+        },
+        render: function render() {
+            return this.props.children(this.state.value);
+        }
+    });
+    function getContext(fiber) {
+        while (fiber.return) {
+            if (fiber.name == 'Provider') {
+                return instance.value;
+            }
+            fiber = fiber.return;
+        }
+        return defaultValue;
+    }
+    getContext.subscribers = [];
+    getContext.Provider = Provider;
+    getContext.Consumer = Consumer;
+    return getContext;
+}
+
+function getDataSet(obj) {
+    var ret = {};
+    for (var name in obj) {
+        if (name.slice(0, 4) == 'data') {
+            var key = toLowerCase(name[4]) + name.slice(5);
+            ret[key] = obj[name];
+        }
+    }
+    return ret;
+}
+var beaconType = /click|tap|change|blur|input/i;
+function dispatchEvent(e) {
+    var instance = this.reactInstance;
+    if (!instance || !instance.$$eventCached) {
+        return;
+    }
+    var eventType = toLowerCase(e._type);
+    var target = e.target;
+    var dataset = getDataSet(target._attr);
+    var app = this.$app.$def;
+    var eventUid = dataset[eventType + 'Uid'];
+    var fiber = instance.$$eventCached[eventUid + 'Fiber'] || {
+        props: {},
+        type: 'unknown'
+    };
+    if (eventType == 'change') {
+        if (fiber.props.value + '' === e.value) {
+            return;
+        }
+    }
+    if (app && app.onCollectLogs && beaconType.test(eventType)) {
+        app.onCollectLogs(dataset, eventType, fiber.stateNode);
+    }
+    var safeTarget = {
+        dataset: dataset,
+        nodeName: target._nodeName,
+        value: e.value
+    };
+    Renderer.batchedUpdates(function () {
+        try {
+            var fn = instance.$$eventCached[eventUid];
+            fn && fn.call(instance, createEvent(e, safeTarget, eventType));
+        } catch (err) {
+            console.log(err.stack);
+        }
+    }, e);
+}
+function createEvent(e, target, type) {
+    var event = {};
+    for (var i in e) {
+        if (i.indexOf('_') !== 0) {
+            event[i] = e[i];
+        }
+    }
+    event.touches = e._touches;
+    event.changeTouches = e._changeTouches;
+    var touch = event.touches && event.touches[0];
+    if (touch) {
+        event.pageX = touch.pageX;
+        event.pageY = touch.pageY;
+    }
+    event.nativeEvent = e;
+    event.stopPropagation = e.stopPropagation.bind(e);
+    event.preventDefault = e.preventDefault.bind(e);
+    event.target = target;
+    event.type = type;
+    event.timeStamp = Date.now();
+    return event;
+}
+
+var fakeApp = {
+    app: {
+        globalData: {}
+    }
+};
+function _getApp() {
+    if (isFn(getApp)) {
+        var app = getApp();
+        if (!app.globalData && app.$def) {
+            app.globalData = app.$def.globalData || {};
+        }
+        return app;
+    }
+    return fakeApp;
+}
+if (typeof getApp === 'function') {
+    _getApp = getApp;
+}
+function callGlobalHook(method, e) {
+    var app = _getApp();
+    if (app && app[method]) {
+        return app[method](e);
+    }
+}
+var delayMounts = [];
+var usingComponents = [];
+var registeredComponents = {};
+function getCurrentPage() {
+    var app = _getApp();
+    return app.$$page && app.$$page.reactInstance;
+}
+function _getCurrentPages() {
+    console.warn('getCurrentPages存在严重的平台差异性，不建议再使用');
+    if (isFn(getCurrentPages)) {
+        return getCurrentPages();
+    }
+}
+function updateMiniApp(instance) {
+    if (!instance || !instance.wx) {
+        return;
+    }
+    var data = safeClone({
+        props: instance.props,
+        state: instance.state || null,
+        context: instance.context
+    });
+    if (instance.wx.setData) {
+        instance.wx.setData(data);
+    } else {
+        updateQuickApp(instance.wx, data);
+    }
+}
+function refreshComponent(reactInstances, wx, uuid) {
+    var pagePath = Object(_getApp()).$$pagePath;
+    for (var i = reactInstances.length - 1; i >= 0; i--) {
+        var reactInstance = reactInstances[i];
+        if (reactInstance.$$pagePath === pagePath && !reactInstance.wx && reactInstance.instanceUid === uuid) {
+            reactInstance.wx = wx;
+            wx.reactInstance = reactInstance;
+            updateMiniApp(reactInstance);
+            return reactInstances.splice(i, 1);
+        }
+    }
+}
+function detachComponent() {
+    var t = this.reactInstance;
+    if (t) {
+        t.wx = null;
+        this.reactInstance = null;
+    }
+}
+function updateQuickApp(quick, data) {
+    for (var i in data) {
+        quick.$set(i, data[i]);
+    }
+}
+function isReferenceType(val) {
+    return typeNumber(val) > 6;
+}
+function runFunction(fn, a, b) {
+    if (isFn(fn)) {
+        fn.call(null, a, b);
+    }
+}
+function functionCount() {
+    var ret = 0;
+    for (var i = 0; i < arguments.length; i++) {
+        if (isFn(arguments[i])) {
+            ret++;
+        }
+    }
+    return ret;
+}
+function apiRunner() {
+    var arg = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    var apiCallback = arguments[1];
+    var apiPromise = arguments[2];
+    var success = arg.success,
+        fail = arg.fail,
+        complete = arg.complete;
+    var handler = functionCount(success, fail, complete) ? apiCallback : apiPromise;
+    arg.success = arg.success || noop;
+    arg.fail = arg.fail || noop;
+    arg.complete = arg.complete || noop;
+    return handler(arg);
+}
+function useComponent(props) {
+    var is = props.is;
+    var clazz = registeredComponents[is];
+    props.key = this.key != null ? this.key : props['data-instance-uid'] || new Date() - 0;
+    delete props.is;
+    if (this.ref !== null) {
+        props.ref = this.ref;
+    }
+    var owner = Renderer.currentOwner;
+    if (owner) {
+        Renderer.currentOwner = get(owner)._owner;
+    }
+    return createElement(clazz, props);
+}
+function safeClone(originVal) {
+    var temp = originVal instanceof Array ? [] : {};
+    for (var item in originVal) {
+        if (hasOwnProperty.call(originVal, item)) {
+            var value = originVal[item];
+            if (isReferenceType(value)) {
+                if (value.$$typeof) {
+                    continue;
+                }
+                temp[item] = safeClone(value);
+            } else {
+                temp[item] = value;
+            }
+        }
+    }
+    return temp;
+}
+function toRenderProps() {
+    return null;
+}
+
+var fetch = require('@system.fetch');
+var JSON_TYPE_STRING = 'json';
+function requestCallback(_ref) {
+  var url = _ref.url,
+      data = _ref.data,
+      header = _ref.header,
+      method = _ref.method,
+      _ref$dataType = _ref.dataType,
+      dataType = _ref$dataType === undefined ? JSON_TYPE_STRING : _ref$dataType,
+      success = _ref.success,
+      fail = _ref.fail,
+      complete = _ref.complete;
+  function onFetchSuccess(_ref2) {
+    var statusCode = _ref2.code,
+        data = _ref2.data,
+        headers = _ref2.header;
+    if (dataType === JSON_TYPE_STRING) {
+      try {
+        data = JSON.parse(data);
+      } catch (error) {
+        runFunction(fail, error);
+      }
+    }
+    success({
+      statusCode: statusCode,
+      data: data,
+      headers: headers
+    });
+  }
+  fetch.fetch({
+    url: url,
+    data: data,
+    header: header,
+    method: method,
+    success: onFetchSuccess,
+    fail: fail,
+    complete: complete
+  });
+}
+function requestPromise(_ref3) {
+  var url = _ref3.url,
+      data = _ref3.data,
+      header = _ref3.header,
+      method = _ref3.method,
+      _ref3$dataType = _ref3.dataType,
+      dataType = _ref3$dataType === undefined ? JSON_TYPE_STRING : _ref3$dataType,
+      complete = _ref3.complete;
+  return new Promise(function (resolve, reject) {
+    function onFetchSuccess(_ref4) {
+      var statusCode = _ref4.code,
+          data = _ref4.data,
+          headers = _ref4.header;
+      if (dataType === JSON_TYPE_STRING) {
+        try {
+          data = JSON.parse(data);
+        } catch (error) {
+          reject(error);
+        }
+      }
+      resolve({
+        statusCode: statusCode,
+        data: data,
+        headers: headers
+      });
+    }
+    fetch.fetch({
+      url: url,
+      data: data,
+      header: header,
+      method: method,
+      success: onFetchSuccess,
+      fail: function fail(error) {
+        return reject(error);
+      },
+      complete: complete
+    });
+  });
+}
+function request(opt) {
+  return apiRunner(opt, requestCallback, requestPromise);
+}
+
+var request$1 = require('@system.request');
+var HTTP_OK_CODE = 200;
+function uploadFile(_ref) {
+  var url = _ref.url,
+      filePath = _ref.filePath,
+      name = _ref.name,
+      header = _ref.header,
+      formData = _ref.formData,
+      success = _ref.success,
+      fail = _ref.fail,
+      complete = _ref.complete;
+  var data = [];
+  Object.keys(formData).map(function (key) {
+    var value = formData[key];
+    var item = {
+      value: value,
+      name: key
+    };
+    data.push(item);
+  });
+  function successForMi(_ref2) {
+    var statusCode = _ref2.code,
+        data = _ref2.data;
+    success({
+      statusCode: statusCode,
+      data: data
+    });
+  }
+  request$1.upload({
+    url: url,
+    header: header,
+    data: data,
+    files: [{ uri: filePath, name: name }],
+    success: successForMi,
+    fail: fail,
+    complete: complete
+  });
+}
+function downloadFile(_ref3) {
+  var url = _ref3.url,
+      header = _ref3.header,
+      success = _ref3.success,
+      fail = _ref3.fail,
+      complete = _ref3.complete;
+  function downloadSuccess(_ref4) {
+    var tempFilePath = _ref4.uri;
+    success({
+      statusCode: HTTP_OK_CODE,
+      tempFilePath: tempFilePath
+    });
+  }
+  function downloadTaskStarted(_ref5) {
+    var token = _ref5.token;
+    request$1.onDownloadComplete({
+      token: token,
+      success: downloadSuccess,
+      fail: fail,
+      complete: complete
+    });
+  }
+  request$1.download({
+    url: url,
+    header: header,
+    success: downloadTaskStarted,
+    fail: fail,
+    complete: complete
+  });
+}
+
+var _typeof$1 = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+var storage = require('@system.storage');
+function setStorage(_ref) {
+  var key = _ref.key,
+      data = _ref.data,
+      success = _ref.success,
+      fail = _ref.fail,
+      complete = _ref.complete;
+  var value = data;
+  if ((typeof value === 'undefined' ? 'undefined' : _typeof$1(value)) === 'object') {
+    try {
+      value = JSON.stringify(value);
+    } catch (error) {
+      runFunction(fail, error);
+    }
+  }
+  storage.set({ key: key, value: value, success: success, fail: fail, complete: complete });
+}
+function getStorage(_ref2) {
+  var key = _ref2.key,
+      success = _ref2.success,
+      fail = _ref2.fail,
+      complete = _ref2.complete;
+  function dataObj(data) {
+    try {
+      data = JSON.parse(data);
+    } catch (e) {}
+    success({
+      data: data
+    });
+  }
+  storage.get({ key: key, success: dataObj, fail: fail, complete: complete });
+}
+function removeStorage(obj) {
+  storage.delete(obj);
+}
+function clearStorage(obj) {
+  storage.clear(obj);
+}
+var storageCache = {};
+function setStorageSync(key, value) {
+  setStorage({
+    key: key,
+    data: value
+  });
+  return storageCache[key] = value;
+}
+function getStoragePromise(key) {
+  return new Promise(function (resolve, rejects) {
+    getStorage({
+      key: key,
+      success: function success(res) {
+        resolve(res.data);
+      },
+      fail: function fail() {
+        rejects(null);
+      }
+    });
+  });
+}
+async function getStorageSync(key) {
+  var value = storageCache[key];
+  if (!value) {
+    value = await getStoragePromise(key);
+  }
+  return value;
+}
+function removeStorageSync(key) {
+  delete storageCache[key];
+  removeStorage({ key: key });
+}
+function clearStorageSync() {
+  storageCache = {};
+  clearStorage({});
+}
+
+var file = require('@system.file');
+var SUCCESS_MESSAGE = 'ok';
+function getSavedFileInfo(_ref) {
+  var uri = _ref.filePath,
+      success = _ref.success,
+      fail = _ref.fail,
+      complete = _ref.complete;
+  function gotFile(_ref2) {
+    var length = _ref2.length,
+        lastModifiedTime = _ref2.lastModifiedTime;
+    success({
+      errMsg: SUCCESS_MESSAGE,
+      size: length,
+      createTime: lastModifiedTime
+    });
+  }
+  file.get({
+    uri: uri,
+    success: gotFile,
+    fail: fail,
+    complete: complete
+  });
+}
+function getSavedFileList(_ref3) {
+  var uri = _ref3.uri,
+      success = _ref3.success,
+      fali = _ref3.fali,
+      complete = _ref3.complete;
+  if (!uri) {
+    runFunction(fail, new Error('小米需要指定目录'));
+  }
+  function gotFileList(fileList) {
+    var newFileList = fileList.map(function (item) {
+      return {
+        fileList: item.uri,
+        size: item.length,
+        createTime: item.lastModifiedTime
+      };
+    });
+    success({
+      fileList: newFileList,
+      errMsg: SUCCESS_MESSAGE
+    });
+  }
+  file.list({
+    uri: uri,
+    success: gotFileList,
+    fali: fali,
+    complete: complete
+  });
+}
+function removeSavedFile(_ref4) {
+  var uri = _ref4.filePath,
+      success = _ref4.success,
+      fail = _ref4.fail,
+      complete = _ref4.complete;
+  file.delete({
+    uri: uri,
+    success: success,
+    fail: fail,
+    complete: complete
+  });
+}
+function saveFile(_ref5) {
+  var srcUri = _ref5.tempFilePath,
+      dstUri = _ref5.destinationFilePath,
+      success = _ref5.success,
+      fail = _ref5.fail,
+      complete = _ref5.complete;
+  if (!dstUri) {
+    runFunction(fail, new Error('小米需要指定需要指定目标路径'));
+  }
+  function gotSuccess(uri) {
+    success({
+      savedFilePath: uri
+    });
+  }
+  file.move({
+    srcUri: srcUri,
+    dstUri: dstUri,
+    success: gotSuccess,
+    fail: fail,
+    complete: complete
+  });
+}
+
+var clipboard = require('@system.clipboard');
+function setClipboardData(_ref) {
+  var text = _ref.data,
+      success = _ref.success,
+      fail = _ref.fail,
+      complete = _ref.complete;
+  clipboard.set({
+    text: text,
+    success: success || noop,
+    fail: fail || noop,
+    complete: complete || noop
+  });
+}
+function getClipboardData(_ref2) {
+  var success = _ref2.success,
+      fail = _ref2.fail,
+      complete = _ref2.complete;
+  function gotSuccess(_ref3) {
+    var data = _ref3.text;
+    success({
+      data: data
+    });
+  }
+  clipboard.get({
+    success: gotSuccess,
+    fail: fail || noop,
+    complete: complete || noop
+  });
+}
+
+var network = require('@system.network');
+function getNetworkType(_ref) {
+  var success = _ref.success,
+      fail = _ref.fail,
+      complete = _ref.complete;
+  function networkTypeGot(_ref2) {
+    var networkType = _ref2.type;
+    success({ networkType: networkType });
+  }
+  network.getType({
+    success: networkTypeGot,
+    fail: fail,
+    complete: complete
+  });
+}
+function onNetworkStatusChange(callback) {
+  function networkChanged(_ref3) {
+    var networkType = _ref3.type;
+    var connectedTypes = ['wifi', '4g', '3g', '2g'];
+    callback({
+      isConnected: connectedTypes.includes(networkType),
+      networkType: networkType
+    });
+  }
+  network.subscribe({ callback: networkChanged });
+}
+
+var device = require('@system.device');
+var DEFAULT_FONT_SIZE = 14;
+function getSystemInfo(options) {
+  if (!options) {
+    console.error('参数格式错误');
+    return;
+  }
+  var success = options.success,
+      fail = options.fail,
+      complete = options.complete;
+  function gotSuccessInfo(_ref) {
+    var brand = _ref.brand,
+        manufacturer = _ref.manufacturer,
+        model = _ref.model,
+        product = _ref.product,
+        osType = _ref.osType,
+        osVersionName = _ref.osVersionName,
+        osVersionCode = _ref.osVersionCode,
+        platformVersionName = _ref.platformVersionName,
+        platformVersionCode = _ref.platformVersionCode,
+        language = _ref.language,
+        region = _ref.region,
+        screenWidth = _ref.screenWidth,
+        screenHeight = _ref.screenHeight;
+    success && success({
+      brand: brand,
+      model: model,
+      screenWidth: screenWidth,
+      screenHeight: screenHeight,
+      windowWidth: screenWidth,
+      windowHeight: screenHeight,
+      statusBarHeight: 0,
+      language: language,
+      version: platformVersionCode,
+      system: osVersionCode,
+      platform: platformVersionName,
+      fontSizeSetting: DEFAULT_FONT_SIZE,
+      SDKVersion: platformVersionCode
+    });
+  }
+  device.getInfo({
+    success: gotSuccessInfo,
+    fail: fail,
+    complete: complete
+  });
+}
+
+var media = require('@system.media');
+var file$1 = require('@system.file');
+function chooseImage(_ref) {
+  var _ref$count = _ref.count,
+      count = _ref$count === undefined ? 1 : _ref$count,
+      _ref$sourceType = _ref.sourceType,
+      sourceType = _ref$sourceType === undefined ? [] : _ref$sourceType,
+      _success = _ref.success,
+      fail = _ref.fail,
+      complete = _ref.complete;
+  if (count > 1) {
+    runFunction(fail, new Error('快应用选择图片的数量不能大于1'));
+  }
+  function imagePicked(_ref2) {
+    var path = _ref2.uri;
+    file$1.get({
+      uri: path,
+      success: function success(_ref3) {
+        var size = _ref3.length;
+        var tempFilePaths = [path];
+        var tempFiles = [{ path: path, size: size }];
+        _success({
+          tempFilePaths: tempFilePaths,
+          tempFiles: tempFiles
+        });
+      },
+      fail: fail
+    });
+  }
+  var pick = sourceType.length === 1 && sourceType[0] === 'camera' ? media.takePhoto : media.pickImage;
+  pick({
+    success: imagePicked,
+    fail: fail || noop,
+    complete: complete || noop,
+    cancel: fail || noop
+  });
+}
+
+function showToast(obj) {
+    var prompt = require('@system.prompt');
+    obj.message = obj.title;
+    obj.duration = obj.duration / 1000;
+    prompt.showToast(obj);
+}
+
+var shortcut = require('@system.shortcut');
+function createShortcut() {
+    shortcut.hasInstalled({
+        success: function success(ret) {
+            if (ret) {
+                showToast({ title: '已创建桌面图标' });
+            } else {
+                shortcut.install({
+                    success: function success() {
+                        showToast({ title: '成功创建桌面图标' });
+                    },
+                    fail: function fail(errmsg, errcode) {
+                        showToast({ title: 'error: ' + errcode + '---' + errmsg });
+                    }
+                });
+            }
+        }
+    });
+}
+
+function createCanvasContext(id, obj) {
+  if (obj.wx && obj.wx.$element) {
+    var el = obj.wx.$element(id);
+    var ctx = el && el.getContext('2d');
+    'strokeStyle,textAlign,textBaseline,fillStyle,lineWidth,lineCap,lineJoin,miterLimit,globalAlpha'.split(',').map(function (item) {
+      var method = 'set' + item.substring(0, 1).toUpperCase() + item.substring(1);
+      ctx[method] = function (value) {
+        ctx[item] = value;
+      };
+    });
+    ctx.setFontSize = function (value) {
+      ctx.font = value + 'px';
+    };
+    ctx.draw = function () {
+      ctx.closePath();
+    };
+    return ctx;
+  } else {
+    throw new Error('createCanvasContext 第二个 字段 this 必须添加');
+  }
+}
+
+function createRouter(name) {
+    return function (obj) {
+        var router = require('@system.router');
+        var params = {};
+        var href = obj ? obj.url || obj.uri || '' : '';
+        var uri = href.slice(href.indexOf('/pages') + 1);
+        uri = uri.replace(/\?(.*)/, function (a, b) {
+            b.split('&').forEach(function (param) {
+                param = param.split('=');
+                params[param[0]] = param[1];
+            });
+            return '';
+        }).replace(/\/index$/, '');
+        if (uri.charAt(0) !== '/') {
+            uri = '/' + uri;
+        }
+        router[name]({
+            uri: uri,
+            params: params
+        });
+    };
+}
+var api = {
+    showModal: function showModal(obj) {
+        obj.showCancel = obj.showCancel === false ? false : true;
+        var buttons = [{
+            text: obj.confirmText,
+            color: obj.confirmColor
+        }];
+        if (obj.showCancel) {
+            buttons.push({
+                text: obj.cancelText,
+                color: obj.cancelColor
+            });
+        }
+        obj.buttons = obj.confirmText ? buttons : [];
+        obj.message = obj.content;
+        delete obj.content;
+        var fn = obj['success'];
+        obj['success'] = function (res) {
+            res.confirm = !res.index;
+            fn && fn(res);
+        };
+        var prompt = require('@system.prompt');
+        prompt.showDialog(obj);
+    },
+    showToast: showToast,
+    hideToast: noop,
+    showActionSheet: function showActionSheet(obj) {
+        var prompt = require('@system.prompt');
+        prompt.showContextMenu(obj);
+    },
+    showLoading: function showLoading(obj) {
+        var prompt = require('@system.prompt');
+        obj.message = obj.title;
+        obj.duration = 1;
+        prompt.showToast(obj);
+    },
+    hideLoading: noop,
+    navigateTo: createRouter('push'),
+    redirectTo: createRouter('replace'),
+    navigateBack: createRouter('back'),
+    vibrateLong: function vibrateLong() {
+        var vibrator = require('@system.vibrator');
+        vibrator.vibrate();
+    },
+    vibrateShort: function vibrateShort() {
+        var vibrator = require('@system.vibrator');
+        vibrator.vibrate();
+    },
+    share: function share(obj) {
+        var share = require('@service.share');
+        share.getAvailablePlatforms({
+            success: function success(data) {
+                var shareType = 0;
+                if (obj.path && obj.title) {
+                    shareType = 0;
+                } else if (obj.title) {
+                    shareType = 1;
+                } else if (obj.imageUrl) {
+                    shareType = 2;
+                }
+                obj.shareType = obj.shareType || shareType;
+                obj.targetUrl = obj.path;
+                obj.summary = obj.desc;
+                obj.imagePath = obj.imageUrl;
+                obj.platforms = data.platforms;
+                share.share(obj);
+            }
+        });
+    },
+    uploadFile: uploadFile,
+    downloadFile: downloadFile,
+    request: request,
+    scanCode: function scanCode(_ref) {
+        var success = _ref.success,
+            fail = _ref.fail,
+            complete = _ref.complete;
+        var barcode = require('@system.barcode');
+        barcode.scan({
+            success: success,
+            fail: fail,
+            cancel: fail,
+            complete: complete
+        });
+    },
+    setStorage: setStorage,
+    getStorage: getStorage,
+    removeStorage: removeStorage,
+    clearStorage: clearStorage,
+    setStorageSync: setStorageSync,
+    getStorageSync: getStorageSync,
+    removeStorageSync: removeStorageSync,
+    clearStorageSync: clearStorageSync,
+    getSavedFileInfo: getSavedFileInfo,
+    getSavedFileList: getSavedFileList,
+    removeSavedFile: removeSavedFile,
+    saveFile: saveFile,
+    setClipboardData: setClipboardData,
+    getClipboardData: getClipboardData,
+    getLocation: function getLocation(obj) {
+        var geolocation = require('@system.geolocation');
+        geolocation.getLocation(obj);
+    },
+    getNetworkType: getNetworkType,
+    onNetworkStatusChange: onNetworkStatusChange,
+    getSystemInfo: getSystemInfo,
+    chooseImage: chooseImage,
+    setNavigationBarTitle: function setNavigationBarTitle(_ref2) {
+        var title = _ref2.title,
+            success = _ref2.success,
+            fail = _ref2.fail,
+            complete = _ref2.complete;
+        try {
+            var currentPage = _getApp().$$page;
+            currentPage.$page.setTitleBar({ text: title });
+            runFunction(success);
+        } catch (error) {
+            runFunction(fail, error);
+        } finally {
+            runFunction(complete);
+        }
+    },
+    createShortcut: createShortcut,
+    createCanvasContext: createCanvasContext,
+    stopPullDownRefresh: function stopPullDownRefresh(obj) {
+        obj = obj || {};
+        var success = obj.success || noop,
+            fail = obj.fail || noop,
+            complete = obj.complete || noop;
+        try {
+            runFunction(success);
+        } catch (error) {
+            runFunction(fail, error);
+        } finally {
+            runFunction(complete);
+        }
+    }
+};
 
 function UpdateQueue() {
     return {
@@ -945,18 +1517,23 @@ function createInstance(fiber, context) {
         type = fiber.type,
         tag = fiber.tag,
         ref = fiber.ref,
+        key = fiber.key,
         isStateless = tag === 1,
         lastOwn = Renderer.currentOwner,
         instance = {
         refs: {},
         props: props,
+        key: key,
         context: context,
         ref: ref,
+        _reactInternalFiber: fiber,
         __proto__: type.prototype
     };
-    fiber.errorHook = "constructor";
+    fiber.updateQueue = UpdateQueue();
+    fiber.errorHook = 'constructor';
     try {
         if (isStateless) {
+            Renderer.currentOwner = instance;
             extend(instance, {
                 __isStateless: true,
                 __init: true,
@@ -971,7 +1548,7 @@ function createInstance(fiber, context) {
                     if (a && a.render) {
                         delete this.__isStateless;
                         for (var i in a) {
-                            instance[i == "render" ? "renderImpl" : i] = a[i];
+                            instance[i == 'render' ? 'renderImpl' : i] = a[i];
                         }
                     } else if (this.__init) {
                         this.__keep = {
@@ -993,13 +1570,12 @@ function createInstance(fiber, context) {
         } else {
             instance = new type(props, context);
             if (!(instance instanceof Component)) {
-                throw type.name + " doesn't extend React.Component";
+                throw type.name + ' doesn\'t extend React.Component';
             }
         }
     } finally {
         Renderer.currentOwner = lastOwn;
         fiber.stateNode = instance;
-        fiber.updateQueue = UpdateQueue();
         instance._reactInternalFiber = fiber;
         instance.updater = updater;
         instance.context = context;
@@ -1028,8 +1604,9 @@ var DETACH = 13;
 var HOOK = 17;
 var REF = 19;
 var CALLBACK = 23;
-var CAPTURE = 29;
-var effectNames = [DUPLEX, HOOK, REF, DETACH, CALLBACK, CAPTURE].sort(function (a, b) {
+var PASSIVE = 29;
+var CAPTURE = 31;
+var effectNames = [DUPLEX, HOOK, REF, DETACH, CALLBACK, PASSIVE, CAPTURE].sort(function (a, b) {
     return a - b;
 });
 var effectLength = effectNames.length;
@@ -1355,21 +1932,29 @@ function updateClassComponent(fiber, info) {
         props = fiber.props;
     var contextStack = info.contextStack,
         containerStack = info.containerStack;
-    var newContext = getMaskedContext(instance, type.contextTypes, contextStack);
+    var getContext = type.contextType;
+    var unmaskedContext = contextStack[0];
+    var isStaticContextType = isFn(type.contextType);
+    var newContext = isStaticContextType ? getContext(fiber) : getMaskedContext(instance, type.contextTypes, unmaskedContext);
     if (instance == null) {
         fiber.parent = type === AnuPortal ? props.parent : containerStack[0];
         instance = createInstance(fiber, newContext);
-        cacheContext(instance, contextStack[0], newContext);
+        if (isStaticContextType) {
+            getContext.subscribers.push(instance);
+        }
     }
-    instance._reactInternalFiber = fiber;
+    if (!isStaticContextType) {
+        cacheContext(instance, unmaskedContext, newContext);
+    }
     var isStateful = !instance.__isStateless;
+    instance._reactInternalFiber = fiber;
     if (isStateful) {
         var updateQueue = fiber.updateQueue;
         delete fiber.updateFail;
         if (fiber.hasMounted) {
             applybeforeUpdateHooks(fiber, instance, props, newContext, contextStack);
         } else {
-            applybeforeMountHooks(fiber, instance, props, newContext, contextStack);
+            applybeforeMountHooks(fiber, instance, props);
         }
         if (fiber.memoizedState) {
             instance.state = fiber.memoizedState;
@@ -1392,14 +1977,14 @@ function updateClassComponent(fiber, info) {
     fiber.memoizedState = instance.state;
     if (instance.getChildContext) {
         var context = instance.getChildContext();
-        context = Object.assign({}, contextStack[0], context);
+        context = Object.assign({}, unmaskedContext, context);
         fiber.shiftContext = true;
         contextStack.unshift(context);
     }
+    if (fiber.parent && fiber.hasMounted && fiber.dirty) {
+        fiber.parent.insertPoint = getInsertPoint(fiber);
+    }
     if (isStateful) {
-        if (fiber.parent && fiber.hasMounted && fiber.dirty) {
-            fiber.parent.insertPoint = getInsertPoint(fiber);
-        }
         if (fiber.updateFail) {
             cloneChildren(fiber);
             fiber._hydrating = false;
@@ -1407,7 +1992,7 @@ function updateClassComponent(fiber, info) {
         }
         delete fiber.dirty;
         fiber.effectTag *= HOOK;
-    } else {
+    } else if (fiber.effectTag == 1) {
         fiber.effectTag = WORKING;
     }
     if (fiber.catchError) {
@@ -1416,16 +2001,16 @@ function updateClassComponent(fiber, info) {
     Renderer.onBeforeRender(fiber);
     fiber._hydrating = true;
     Renderer.currentOwner = instance;
-    var rendered = applyCallback(instance, "render", []);
+    var rendered = applyCallback(instance, 'render', []);
     diffChildren(fiber, rendered);
     Renderer.onAfterRender(fiber);
 }
 function applybeforeMountHooks(fiber, instance, newProps) {
     fiber.setout = true;
     if (instance.__useNewHooks) {
-        setStateByProps(instance, fiber, newProps, instance.state);
+        setStateByProps(fiber, newProps, instance.state);
     } else {
-        callUnsafeHook(instance, "componentWillMount", []);
+        callUnsafeHook(instance, 'componentWillMount', []);
     }
     delete fiber.setout;
     mergeStates(fiber, newProps);
@@ -1438,12 +2023,12 @@ function applybeforeUpdateHooks(fiber, instance, newProps, newContext, contextSt
     updater.prevProps = oldProps;
     updater.prevState = oldState;
     var propsChanged = oldProps !== newProps;
-    var contextChanged = instance.context !== newContext;
     fiber.setout = true;
     if (!instance.__useNewHooks) {
+        var contextChanged = instance.context !== newContext;
         if (propsChanged || contextChanged) {
             var prevState = instance.state;
-            callUnsafeHook(instance, "componentWillReceiveProps", [newProps, newContext]);
+            callUnsafeHook(instance, 'componentWillReceiveProps', [newProps, newContext]);
             if (prevState !== instance.state) {
                 fiber.memoizedState = instance.state;
             }
@@ -1453,7 +2038,7 @@ function applybeforeUpdateHooks(fiber, instance, newProps, newContext, contextSt
     var updateQueue = fiber.updateQueue;
     mergeStates(fiber, newProps);
     newState = fiber.memoizedState;
-    setStateByProps(instance, fiber, newProps, newState);
+    setStateByProps(fiber, newProps, newState);
     newState = fiber.memoizedState;
     delete fiber.setout;
     fiber._hydrating = true;
@@ -1462,23 +2047,23 @@ function applybeforeUpdateHooks(fiber, instance, newProps, newContext, contextSt
     } else {
         var args = [newProps, newState, newContext];
         fiber.updateQueue = UpdateQueue();
-        if (!updateQueue.isForced && !applyCallback(instance, "shouldComponentUpdate", args)) {
+        if (!updateQueue.isForced && !applyCallback(instance, 'shouldComponentUpdate', args)) {
             fiber.updateFail = true;
         } else if (!instance.__useNewHooks) {
-            callUnsafeHook(instance, "componentWillUpdate", args);
+            callUnsafeHook(instance, 'componentWillUpdate', args);
         }
     }
 }
 function callUnsafeHook(a, b, c) {
     applyCallback(a, b, c);
-    applyCallback(a, "UNSAFE_" + b, c);
+    applyCallback(a, 'UNSAFE_' + b, c);
 }
 function isSameNode(a, b) {
     if (a.type === b.type && a.key === b.key) {
         return true;
     }
 }
-function setStateByProps(instance, fiber, nextProps, prevState) {
+function setStateByProps(fiber, nextProps, prevState) {
     fiber.errorHook = gDSFP;
     var fn = fiber.type[gDSFP];
     if (fn) {
@@ -1507,28 +2092,25 @@ function cacheContext(instance, unmaskedContext, context) {
     instance.__unmaskedContext = unmaskedContext;
     instance.__maskedContext = context;
 }
-function getMaskedContext(instance, contextTypes, contextStack) {
-    if (instance && !contextTypes) {
-        return instance.context;
-    }
-    var context = {};
-    if (!contextTypes) {
-        return context;
-    }
-    var unmaskedContext = contextStack[0];
+function getMaskedContext(instance, contextTypes, unmaskedContext) {
+    var noContext = !contextTypes;
     if (instance) {
+        if (noContext) {
+            return instance.context;
+        }
         var cachedUnmasked = instance.__unmaskedContext;
         if (cachedUnmasked === unmaskedContext) {
             return instance.__maskedContext;
         }
     }
+    var context = {};
+    if (noContext) {
+        return context;
+    }
     for (var key in contextTypes) {
         if (contextTypes.hasOwnProperty(key)) {
             context[key] = unmaskedContext[key];
         }
-    }
-    if (instance) {
-        cacheContext(instance, unmaskedContext, context);
     }
     return context;
 }
@@ -1617,7 +2199,7 @@ var Refs = {
                 fiber.deleteRef = true;
             }
         } catch (e) {
-            pushError(fiber, "ref", e);
+            pushError(fiber, 'ref', e);
         }
     }
 };
@@ -1640,9 +2222,10 @@ var refStrategy = {
     }
 };
 
-var domFns = ["insertElement", "updateContent", "updateAttribute"];
+var domFns = ['insertElement', 'updateContent', 'updateAttribute'];
 var domEffects = [PLACE, CONTENT, ATTR];
 var domRemoved = [];
+var passiveFibers = [];
 function commitDFSImpl(fiber) {
     var topFiber = fiber;
     outerLoop: while (true) {
@@ -1675,8 +2258,10 @@ function commitDFSImpl(fiber) {
         while (f) {
             if (f.effectTag === WORKING) {
                 f.effectTag = NOWORK;
+                f.hasMounted = true;
             } else if (f.effectTag > WORKING) {
                 commitEffects(f);
+                f.hasMounted = true;
                 if (f.capturedValues) {
                     f.effectTag = CAPTURE;
                 }
@@ -1700,6 +2285,12 @@ function commitDFS(effects$$1) {
                 disposeFiber(el);
             } else {
                 commitDFSImpl(el);
+            }
+            if (passiveFibers.length) {
+                passiveFibers.forEach(function (fiber) {
+                    safeInvokeHooks(fiber.updateQueue, 'passive', 'unpassive');
+                });
+                passiveFibers.length = 0;
             }
             if (domRemoved.length) {
                 domRemoved.forEach(Renderer.removeElement);
@@ -1731,17 +2322,22 @@ function commitEffects(fiber) {
                     Renderer.updateControlled(fiber);
                     break;
                 case HOOK:
-                    if (fiber.hasMounted) {
-                        guardCallback(instance, "componentDidUpdate", [updater.prevProps, updater.prevState, updater.snapshot]);
+                    if (instance.__isStateless) {
+                        safeInvokeHooks(fiber.updateQueue, 'layout', 'unlayout');
+                    } else if (fiber.hasMounted) {
+                        guardCallback(instance, 'componentDidUpdate', [updater.prevProps, updater.prevState, updater.snapshot]);
                     } else {
                         fiber.hasMounted = true;
-                        guardCallback(instance, "componentDidMount", []);
+                        guardCallback(instance, 'componentDidMount', []);
                     }
                     delete fiber._hydrating;
                     if (fiber.catchError) {
                         fiber.effectTag = amount;
                         return;
                     }
+                    break;
+                case PASSIVE:
+                    passiveFibers.push(fiber);
                     break;
                 case REF:
                     Refs.fireRef(fiber, instance);
@@ -1790,13 +2386,35 @@ function disposeFibers(fiber) {
     delete fiber.oldChildren;
     fiber.children = {};
 }
+function safeInvokeHooks(upateQueue, create, destory) {
+    var uneffects = upateQueue[destory],
+        effects$$1 = upateQueue[create],
+        fn;
+    if (!uneffects) {
+        return;
+    }
+    while (fn = uneffects.shift()) {
+        try {
+            fn();
+        } catch (e) {      }
+    }
+    while (fn = effects$$1.shift()) {
+        try {
+            var f = fn();
+            if (typeof f === 'function') {
+                uneffects.push(f);
+            }
+        } catch (e) {      }
+    }
+}
 function disposeFiber(fiber, force) {
     var stateNode = fiber.stateNode,
         effectTag = fiber.effectTag;
     if (!stateNode) {
         return;
     }
-    if (!stateNode.__isStateless && fiber.ref) {
+    var isStateless = stateNode.__isStateless;
+    if (!isStateless && fiber.ref) {
         Refs.fireRef(fiber, null);
     }
     if (effectTag % DETACH == 0 || force === true) {
@@ -1805,8 +2423,12 @@ function disposeFiber(fiber, force) {
         } else {
             Renderer.onDispose(fiber);
             if (fiber.hasMounted) {
+                if (isStateless) {
+                    safeInvokeHooks(fiber.updateQueue, 'layout', 'unlayout');
+                    safeInvokeHooks(fiber.updateQueue, 'passive', 'unpassive');
+                }
                 stateNode.updater.enqueueSetState = returnFalse;
-                guardCallback(stateNode, "componentWillUnmount", []);
+                guardCallback(stateNode, 'componentWillUnmount', []);
                 delete fiber.stateNode;
             }
         }
@@ -1850,7 +2472,7 @@ function render(vnode, root, callback) {
         Renderer.emptyElement(container);
     }
     var carrier = {};
-    updateComponent(container.hostRoot, {
+    updateComponent(container.child, {
         child: vnode
     }, wrapCb(callback, carrier), immediateUpdate);
     return carrier.instance;
@@ -2013,8 +2635,7 @@ function pushChildQueue(fiber, queue) {
         queue.push(fiber);
     }
 }
-function updateComponent(instance, state, callback, immediateUpdate) {
-    var fiber = get(instance);
+function updateComponent(fiber, state, callback, immediateUpdate) {
     fiber.dirty = true;
     var sn = typeNumber(state);
     var isForced = state === true;
@@ -2040,7 +2661,7 @@ function validateTag(el) {
 function createContainer(root, onlyGet, validate) {
     validate = validate || validateTag;
     if (!validate(root)) {
-        throw "container is not a element";
+        throw 'container is not a element';
     }
     root.anuProp = 2018;
     var useProp = root.anuProp === 2018;
@@ -2061,7 +2682,7 @@ function createContainer(root, onlyGet, validate) {
     var container = new Fiber({
         stateNode: root,
         tag: 5,
-        name: "hostRoot",
+        name: 'hostRoot',
         contextStack: [{}],
         containerStack: [root],
         microtasks: [],
@@ -2085,70 +2706,27 @@ function getContainer(p) {
     }
 }
 
-var _typeof$1 = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
-function _uuid() {
-    return (Math.random() + '').slice(-4);
-}
-var delayMounts = [];
-function getUUID() {
-    return _uuid() + _uuid();
-}
-function updateMiniApp(instance) {
-    if (!instance || !instance.wx) {
-        return;
-    }
-    instance.wx.setData(safeClone({
-        props: instance.props,
-        state: instance.state || null,
-        context: instance.context
-    }));
-}
-function isReferenceType(val) {
-    return val && ((typeof val === 'undefined' ? 'undefined' : _typeof$1(val)) === 'object' || Object.prototype.toString.call(val) === '[object Array]');
-}
-function safeClone(originVal) {
-    var temp = originVal instanceof Array ? [] : {};
-    for (var item in originVal) {
-        if (hasOwnProperty.call(originVal, item)) {
-            var value = originVal[item];
-            if (isReferenceType(value)) {
-                if (value.$$typeof) {
-                    continue;
-                }
-                temp[item] = safeClone(value);
-            } else {
-                temp[item] = value;
-            }
-        }
-    }
-    return temp;
-}
-function toRenderProps(props) {
-    return null;
-}
-
 var onEvent = /(?:on|catch)[A-Z]/;
-function getEventHashCode(name, props, key) {
+function getEventUid(name, props) {
     var n = name.charAt(0) == 'o' ? 2 : 5;
     var type = toLowerCase(name.slice(n));
-    var eventCode = props['data-' + type + '-uid'];
-    return eventCode + (key != null ? '-' + key : '');
+    return props['data-' + type + '-uid'];
 }
 var Renderer$1 = createRenderer({
     render: render,
     updateAttribute: function updateAttribute(fiber) {
         var props = fiber.props,
             lastProps = fiber.lastProps;
-        var classId = props['data-class-uid'];
+        var beaconId = props['data-beacon-uid'];
         var instance = fiber._owner;
         if (instance && !instance.classUid) {
             instance = get(instance)._owner;
         }
-        if (instance && classId) {
+        if (instance && beaconId) {
             var cached = instance.$$eventCached || (instance.$$eventCached = {});
             for (var name in props) {
                 if (onEvent.test(name) && isFn(props[name])) {
-                    var code = getEventHashCode(name, props, props['data-key']);
+                    var code = getEventUid(name, props);
                     cached[code] = props[name];
                     cached[code + 'Fiber'] = fiber;
                 }
@@ -2156,9 +2734,9 @@ var Renderer$1 = createRenderer({
             if (lastProps) {
                 for (var _name in lastProps) {
                     if (onEvent.test(_name) && !props[_name]) {
-                        code = getEventHashCode(_name, lastProps, lastProps['data-key']);
-                        delete cached[code];
-                        delete cached[code + 'Fiber'];
+                        var _code = getEventUid(_name, lastProps);
+                        delete cached[_code];
+                        delete cached[_code + 'Fiber'];
                     }
                 }
             }
@@ -2169,49 +2747,31 @@ var Renderer$1 = createRenderer({
     },
     onBeforeRender: function onBeforeRender(fiber) {
         var type = fiber.type;
+        var instance = fiber.stateNode;
+        var app = _getApp();
         if (type.reactInstances) {
-            var name = fiber.name;
-            var noMount = !fiber.hasMounted;
-            var instance = fiber.stateNode;
+            var uuid = fiber.props['data-instance-uid'] || null;
             if (!instance.instanceUid) {
-                var uuid = 'i' + getUUID();
                 instance.instanceUid = uuid;
-                type[uuid] = instance;
             }
-            instance.props.instanceUid = instance.instanceUid;
-            if (type.wxInstances) {
-                if (type.wxInstances.length && !instance.wx) {
-                    var wx = instance.wx = type.wxInstances.shift();
-                    wx.reactInstance = instance;
-                    console.log('onBeforeRender时更新', name, instance.props);
-                }
+            var wxInstances = type.wxInstances;
+            if (wxInstances) {
                 if (!instance.wx) {
-                    console.log('onBeforeRender时更新', name, '没有wx');
+                    instance.$$pagePath = Object(_getApp()).$$pagePath;
                     type.reactInstances.push(instance);
                 }
             }
         }
-        if (noMount && instance.componentDidMount) {
+        if (!app.$$pageIsReady && instance.componentDidMount) {
             delayMounts.push({
                 instance: instance,
                 fn: instance.componentDidMount
             });
-            instance.componentDidMount = noop;
+            instance.componentDidMount = Date;
         }
     },
     onAfterRender: function onAfterRender(fiber) {
-        var instance = fiber.stateNode;
-        if (instance.wx) {
-            updateMiniApp(instance);
-        }
-    },
-    onDispose: function onDispose(fiber) {
-        var instance = fiber.stateNode;
-        var wx = instance.wx;
-        if (wx) {
-            wx.reactInstance = null;
-            instance.wx = null;
-        }
+        updateMiniApp(fiber.stateNode);
     },
     createElement: function createElement(fiber) {
         return fiber.tag === 5 ? {
@@ -2233,11 +2793,13 @@ var Renderer$1 = createRenderer({
             if (before == null) {
                 if (dom !== children[0]) {
                     remove(children, dom);
+                    dom.parentNode = parentNode;
                     children.unshift(dom);
                 }
             } else {
                 if (dom !== children[children.length - 1]) {
                     remove(children, dom);
+                    dom.parentNode = parentNode;
                     var i = children.indexOf(before);
                     children.splice(i + 1, 0, dom);
                 }
@@ -2257,6 +2819,7 @@ var Renderer$1 = createRenderer({
         if (fiber.parent) {
             var parent = fiber.parent;
             var node = fiber.stateNode;
+            node.parentNode = null;
             remove(parent.children, node);
         }
     }
@@ -2268,173 +2831,265 @@ function remove(children, node) {
     }
 }
 
-var rhyphen = /([a-z\d])([A-Z]+)/g;
-function hyphen(target) {
-    return target.replace(rhyphen, '$1-$2').toLowerCase();
+var rcamel = /-(\w)/g;
+var rpx = /(\d+)px/gi;
+function camel(target) {
+    return target.replace(rcamel, function (all, letter) {
+        return letter.toUpperCase();
+    });
 }
 function transform(obj) {
-    var _this = this;
-    return Object.keys(obj).map(function (item) {
-        var value = obj[item].toString();
-        value = value.replace(/(\d+)px/gi, function (str, match) {
-            return _this.pxTransform(match);
+    var ret = {};
+    for (var i in obj) {
+        var value = obj[i] + '';
+        value = value.replace(rpx, function (str, match) {
+            return match + 'px';
         });
-        return hyphen(item) + ': ' + value;
-    }).join(';');
+        ret[camel(i)] = value;
+    }
+    return ret;
 }
 function toStyle(obj, props, key) {
     if (props) {
+        if (obj + "" === obj) {
+            var ret = {};
+            obj.split(';').forEach(function (el) {
+                var index = el.indexOf(':');
+                var name = el.slice(0, index).trim();
+                var value = el.slice(index).trim();
+                if (name) {
+                    ret[name] = value;
+                }
+            });
+            obj = ret;
+        }
         var str = transform.call(this, obj);
         props[key] = str;
     } else {
-        console.warn('props 为空');
+        console.warn('toStyle生成样式失败，key为', key);
     }
     return obj;
 }
 
-var registeredComponents = {};
-function useComponent(props) {
-    var is = props.is;
-    var clazz = registeredComponents[is];
-    delete props.is;
-    var args = [].slice.call(arguments, 2);
-    args.unshift(clazz, props);
-    console.log('使用组件', is);
-    return createElement.apply(null, args);
-}
-
-var HookMap = {
-    onShow: 'componentDidShow',
-    onHide: 'componentDidHide',
-    onUnload: 'componentWillUnmount'
-};
-function applyAppStore() {
-    console.log('此方法已废弃');
-}
-function registerPage(PageClass, path, testObject) {
-    PageClass.reactInstances = [];
-    console.log(path, '注册页面');
-    var pageViewInstance,
-        config = {
-        data: {},
-        dispatchEvent: eventSystem.dispatchEvent,
-        onLoad: function onLoad(query) {
-            console.log('开始载入页面', path);
-            pageViewInstance = render(createElement(PageClass, {
-                path: path,
-                query: query,
-                isPageComponent: true
-            }), {
-                type: 'page',
+function registerComponent(type, name) {
+    type.wxInstances = {};
+    registeredComponents[name] = type;
+    var reactInstances = type.reactInstances = [];
+    return {
+        data: function data() {
+            return {
                 props: {},
-                children: [],
-                root: true,
-                appendChild: noop
-            });
-            this.reactInstance = pageViewInstance;
-            pageViewInstance.wx = this;
-            console.log('更新页面数据', path);
-            updateMiniApp(pageViewInstance);
+                state: {},
+                context: {}
+            };
         },
         onReady: function onReady() {
-            console.log('页面布局完成', path);
-            var el;
-            while (el = delayMounts.pop()) {
-                el.fn.call(el.instance);
-                el.instance.componentDidMount = el.fn;
-            }
-        }
+            usingComponents[name] = type;
+            var uuid = this.dataInstanceUid || null;
+            refreshComponent(reactInstances, this, uuid);
+        },
+        onDestroy: detachComponent,
+        dispatchEvent: dispatchEvent
     };
-    Array('onPageScroll', 'onShareAppMessage', 'onReachBottom', 'onPullDownRefresh', 'onShow', 'onHide', 'onUnload').forEach(function (hook) {
-        config[hook] = function () {
-            var name = HookMap[hook] || hook;
-            var fn = pageViewInstance[name];
-            if (isFn(fn)) {
-                return fn.apply(pageViewInstance, arguments);
+}
+
+function onLoad(PageClass, path, query) {
+    var app = _getApp();
+    app.$$pageIsReady = false;
+    app.$$page = this;
+    app.$$pagePath = path;
+    var container = {
+        type: 'page',
+        props: {},
+        children: [],
+        root: true,
+        appendChild: noop
+    };
+    var pageInstance = render(
+    createElement(PageClass, {
+        path: path,
+        query: query,
+        isPageComponent: true
+    }), container);
+    callGlobalHook('onGlobalLoad');
+    this.reactContainer = container;
+    this.reactInstance = pageInstance;
+    pageInstance.wx = this;
+    updateMiniApp(pageInstance);
+    return pageInstance;
+}
+function onReady() {
+    var app = _getApp();
+    app.$$pageIsReady = true;
+    var el = void 0;
+    while (el = delayMounts.pop()) {
+        el.fn.call(el.instance);
+        el.instance.componentDidMount = el.fn;
+    }
+    callGlobalHook('onGlobalReady');
+}
+function onUnload() {
+    for (var i in usingComponents) {
+        var a = usingComponents[i];
+        if (a.reactInstances.length) {
+            a.reactInstances.length = 0;
+            a.wxInstances.length = 0;
+        }
+        delete usingComponents[i];
+    }
+    var root = this.reactContainer;
+    var container = root && root._reactInternalFiber;
+    if (container) {
+        Renderer.updateComponent(container.child, {
+            child: null
+        }, function () {
+            root._reactInternalFiber = null;
+            var j = topNodes.indexOf(root);
+            if (j !== -1) {
+                topFibers.splice(j, 1);
+                topNodes.splice(j, 1);
+            }
+        }, true);
+    }
+    callGlobalHook('onGlobalUnload');
+}
+
+function showMenu(instance, app) {
+    api.getSystemInfo({
+        success: function success(appInfo) {
+            api.showActionSheet({
+                itemList: ['转发', '保存到桌面', '关于', '取消'],
+                success: function success(ret) {
+                    switch (ret.index) {
+                        case 0:
+                            var fn = instance.onShareAppMessage;
+                            var obj = fn && fn();
+                            if (obj) {
+                                api.share(obj);
+                            }
+                            fn = app.onGlobalShare;
+                            obj = fn && fn();
+                            if (obj) {
+                                api.share(obj);
+                            }
+                            break;
+                        case 1:
+                            api.createShortcut();
+                            break;
+                        case 2:
+                            api.redirectTo({
+                                url: 'pages/about/index?brand=' + appInfo.brand + '&version=' + appInfo.version
+                            });
+                            break;
+                        case 3:
+                            break;
+                    }
+                }
+            });
+        }
+    });
+}
+
+var globalHooks = {
+    onShareAppMessage: 'onGlobalShare',
+    onShow: 'onGlobalShow',
+    onHide: 'onGlobalHide'
+};
+function getUrlAndQuery(page) {
+    var path = page.path;
+    var query = {};
+    page.uri.replace(/\?(.*)/, function (a, b) {
+        b.split('&').forEach(function (param) {
+            param = param.split('=');
+            query[param[0]] = param[1];
+        });
+        return '';
+    });
+    return [path, query];
+}
+function registerPage(PageClass) {
+    PageClass.reactInstances = [];
+    var config = {
+        private: {
+            props: Object,
+            context: Object,
+            state: Object
+        },
+        dispatchEvent: dispatchEvent,
+        onInit: function onInit() {
+            var $app = this.$app;
+            var array = getUrlAndQuery(this.$page);
+            var instance = onLoad.call(this, PageClass, array[0], array[1]);
+            var pageConfig = instance.config || PageClass.config;
+            $app.$$pageConfig = pageConfig && Object.keys(pageConfig).length ? pageConfig : null;
+        },
+        onReady: onReady,
+        onDestroy: onUnload
+    };
+    Array('onShow', 'onHide', 'onMenuPress').forEach(function (hook) {
+        config[hook] = function (e) {
+            var instance = this.reactInstance;
+            var fn = instance[hook];
+            if (hook === 'onShow') {
+                _getApp().$$page = instance.wx;
+                _getApp().$$pagePath = instance.props.path;
+            }
+            if (hook === 'onMenuPress') {
+                showMenu(instance, this.$app);
+            } else if (isFn(fn)) {
+                fn.call(instance, e);
+            }
+            var globalHook = globalHooks[hook];
+            if (globalHook) {
+                callGlobalHook(globalHook, e);
             }
         };
     });
-    if (testObject) {
-        config.setData = function (obj) {
-            config.data = obj;
-        };
-        config.onLoad();
-        return config;
-    }
     return config;
 }
 
-var win = getWindow();
-var React = void 0;
 var render$1 = Renderer$1.render;
-function registerComponent(type, name) {
-    registeredComponents[name] = type;
-    var reactInstances = type.reactInstances = [];
-    var wxInstances = type.wxInstances = [];
-    return {
-        private: {
-            props: {},
-            state: {},
-            context: {}
-        },
-        onInit: function onInit() {
-            var instance = reactInstances.shift();
-            if (instance) {
-                console.log("created时为", name, "添加wx");
-                instance.wx = this;
-                this.reactInstance = instance;
-            } else {
-                console.log("created时为", name, "没有对应react实例");
-                wxInstances.push(this);
-            }
-        },
-        onReady: function onReady() {
-            if (this.reactInstance) {
-                updateMiniApp(this.reactInstance);
-                console.log("attached时更新", name);
-            } else {
-                console.log("attached时无法更新", name);
-            }
-        },
-        onDestroy: function onDestroy() {
-            this.reactInstance = null;
-        },
-        methods: {
-            dispatchEvent: eventSystem.dispatchEvent
-        }
-    };
-}
-React = win.React = {
-    eventSystem: eventSystem,
+var React = getWindow().React = {
+    eventSystem: {
+        dispatchEvent: dispatchEvent
+    },
     findDOMNode: function findDOMNode() {
         console.log("小程序不支持findDOMNode");
     },
-    version: '1.4.8',
+    version: '1.5.0',
     render: render$1,
     hydrate: render$1,
     Fragment: Fragment,
     PropTypes: PropTypes,
     Children: Children,
     Component: Component,
+    createPortal: createPortal,
     createElement: createElement,
+    createFactory: createFactory,
     cloneElement: cloneElement,
     PureComponent: PureComponent,
     isValidElement: isValidElement,
-    createFactory: createFactory,
-    toClass: function toClass() {
-        return miniCreateClass.apply(null, arguments);
-    },
-    applyAppStore: applyAppStore,
+    createContext: createContext,
+    toClass: miniCreateClass,
     toRenderProps: toRenderProps,
     useComponent: useComponent,
     registerComponent: registerComponent,
+    getCurrentPage: getCurrentPage,
+    getCurrentPages: _getCurrentPages,
+    getApp: _getApp,
     registerPage: registerPage,
     toStyle: toStyle,
-    appType: 'quick'
+    appType: 'quick',
+    registerApp: function registerApp(demo) {
+        var app = {};
+        for (var i in demo) {
+            app[i] = demo[i];
+        }
+        delete app.constructor;
+        return app;
+    },
+    api: api
 };
-var apiContainer = {};
-injectAPIs(React, apiContainer);
-var React$1 = React;
 
-export default React$1;
-export { registerComponent, Children, createElement, Component };
+export default React;
+export { Children, createElement, Component };

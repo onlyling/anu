@@ -1,3 +1,6 @@
+/**
+ * 用于收集要生成的文件，格式为 {code, path}
+ */
 let utils = require('./utils/index');
 let queue = [];
 queue.size = 0;
@@ -8,3 +11,4 @@ queue.push = function(data){
     utils.emit('build');
 };
 module.exports = queue;
+
